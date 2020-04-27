@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 using UnityEngine;
 
 public class Rocket : MonoBehaviour
@@ -8,60 +9,111 @@ public class Rocket : MonoBehaviour
     [SerializeField] float rcsThrust = 150f; //Reaction Control System 
     [SerializeField] float mainThrust = 1500f; //Thrusting
 
+    [SerializeField] AudioClip mainEngineSFX;
+    [SerializeField] AudioClip successSFX;
+    [SerializeField] AudioClip deathSFX;
+
+    [SerializeField] ParticleSystem mainEnginePS;
+    [SerializeField] ParticleSystem successPS;
+    [SerializeField] ParticleSystem deathPS;
+
     private Rigidbody rigidBody;
     private AudioSource audioSource;
 
-    // Start is called before the first frame update
+    enum State {Alive, Transcending, Dying };
+    State state = State.Alive;
+
     void Start()
     {
         rigidBody = GetComponent<Rigidbody>();
         audioSource = GetComponent<AudioSource>();
     }
 
-    // Update is called once per frame
     void FixedUpdate()
     {
-        Rotate();
-        Thrust();
-    } 
- 
-   
-    
-
+     
+        if (state == State.Alive)
+        {
+            RespondToRotateInput();
+            RespondToThrustInput();
+        }
+        
+    }
+          
     void OnCollisionEnter(Collision collision)
     {
-        print("Collided");
+        if (state != State.Alive){ return; } //ignore collisions when dead
+        
         switch (collision.gameObject.tag)
         {
             case "Friendly":
-                print("Friendly Collision"); //todo remove this line
+
                 break;
-            case "Fuel":
-                print("Fuel Collision"); //todo remove this line
+            case "Finish":
+                StartSuccessSequence();
                 break;
             default:
-                print("Death Collision"); //todo remove this line
+                StartDeathSequence();
+
+
                 break;
         }
     }
-    private void Thrust()
+
+    private void StartSuccessSequence()
     {
-        float thrustThisFrame = mainThrust * Time.deltaTime;
+        state = State.Transcending;
+        successPS.Play();
+        audioSource.Stop();
+        audioSource.PlayOneShot(successSFX);
+        Invoke("LoadNextScene", 2f); //#todo parameterise time
+    }
+
+    private void StartDeathSequence()
+    {
+        state = State.Dying;
+        deathPS.Play();
+        audioSource.Stop();
+        audioSource.PlayOneShot(deathSFX);
+        Invoke("LoadFirstLevel", 2f);
+    }
+
+    private void LoadNextScene()
+    {
+        SceneManager.LoadScene(1); //#TODO allow for more than 2 levels
+    }
+
+    private void LoadFirstLevel()
+    {
+        SceneManager.LoadScene(0);
+    }    
+
+    private void RespondToThrustInput()
+    {
+        
         if (Input.GetKey(KeyCode.Space)) // Can thrust while rotating
         {
-            rigidBody.AddRelativeForce(Vector3.up * thrustThisFrame);
-            print("Thrusting");
-            if (!audioSource.isPlaying) //Para que no se superponga 
-            {
-                audioSource.Play();
-            }
+            ApplyThrust();
+
         }
         else
         {
             audioSource.Stop();
+            mainEnginePS.Stop();
         }
     }
-    void Rotate()
+
+    private void ApplyThrust()
+    {
+        rigidBody.AddRelativeForce(Vector3.up * mainThrust*Time.fixedDeltaTime);
+        if (!audioSource.isPlaying) //Para que no se superponga 
+        {
+            audioSource.PlayOneShot(mainEngineSFX);
+        }
+        mainEnginePS.Play();
+    }
+
+    void RespondToRotateInput()
     {
         rigidBody.freezeRotation = true; //Taking manual control of rotation
        
@@ -69,16 +121,16 @@ public class Rocket : MonoBehaviour
         if (Input.GetKey(KeyCode.A))
         {
             transform.Rotate(Vector3.forward * rotationThisFrame);
-            print("Rotating Left");
-
+           
         }
         else if (Input.GetKey(KeyCode.D))
         {
             transform.Rotate(-Vector3.forward * rotationThisFrame);
-            print("Rotating Right");
         }
+
         rigidBody.freezeRotation = false; //Resume physics control of rotation
     }
     
    
 }
+
