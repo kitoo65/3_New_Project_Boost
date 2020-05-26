@@ -17,11 +17,15 @@ public class Rocket : MonoBehaviour
     [SerializeField] ParticleSystem successPS;
     [SerializeField] ParticleSystem deathPS;
 
+    [SerializeField] float levelLoadDelay = 2f;
+
     private Rigidbody rigidBody;
     private AudioSource audioSource;
 
-    enum State {Alive, Transcending, Dying };
+    enum State {Alive, Transcending, Dying};
     State state = State.Alive;
+
+    bool collisionsDisabled = false;
 
     void Start()
     {
@@ -36,13 +40,33 @@ public class Rocket : MonoBehaviour
         {
             RespondToRotateInput();
             RespondToThrustInput();
+            
+        }
+        if (Debug.isDebugBuild)
+        {
+            RespondToDebugLevelKeys();
         }
         
+
+    }
+
+    void RespondToDebugLevelKeys()
+    {
+        if (Input.GetKeyDown(KeyCode.L))
+        {
+            LoadNextScene();
+        }
+        else if (Input.GetKeyDown(KeyCode.C))
+        {
+            collisionsDisabled = !collisionsDisabled;
+           
+        }
     }
           
     void OnCollisionEnter(Collision collision)
     {
-        if (state != State.Alive){ return; } //ignore collisions when dead
+        if (state != State.Alive || collisionsDisabled ){ return; }
+      
         
         switch (collision.gameObject.tag)
         {
@@ -66,7 +90,7 @@ public class Rocket : MonoBehaviour
         successPS.Play();
         audioSource.Stop();
         audioSource.PlayOneShot(successSFX);
-        Invoke("LoadNextScene", 2f); //#todo parameterise time
+        Invoke("LoadNextScene", levelLoadDelay); 
     }
 
     private void StartDeathSequence()
@@ -75,12 +99,20 @@ public class Rocket : MonoBehaviour
         deathPS.Play();
         audioSource.Stop();
         audioSource.PlayOneShot(deathSFX);
-        Invoke("LoadFirstLevel", 2f);
+        Invoke("LoadFirstLevel", levelLoadDelay);
     }
 
     private void LoadNextScene()
     {
-        SceneManager.LoadScene(1); //#TODO allow for more than 2 levels
+        int cantidadEscenas = SceneManager.sceneCountInBuildSettings;
+        int currentSceneBuildIndex = SceneManager.GetActiveScene().buildIndex;
+        int nextSceneIndex = currentSceneBuildIndex + 1;
+        if (nextSceneIndex == cantidadEscenas)
+        {
+            nextSceneIndex = 0; //loop back to start
+        }
+
+        SceneManager.LoadScene(nextSceneIndex);
     }
 
     private void LoadFirstLevel()
